@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "cillian.leiste",
+  "name": "Glas-Leiste",
+  "version": "1.0.0",
+  "author": "cillian",
+  "description": "Glas-Kapsel hinter der oberen Leiste (Stil wie das Startmenue): Schatten, Glanz, helle Rand-Enden (stillstehend)",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Leiste.qml"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "cillian.start",
+  "name": "Startmenü",
+  "version": "1.0.0",
+  "author": "cillian",
+  "description": "Startmenü für SUPER+SPACE: Uhr, Suche, Favoriten, Ordner, Systemwerte, Ein/Aus",
+  "kinds": [
+    "menu"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "Start.qml"
+  }
+}

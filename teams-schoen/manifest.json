@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Teams Rauchglas",
+  "version": "1.0",
+  "description": "Teams im Rauchglas-Look: Graphit statt Lila, schwebende Glas-Karten, runde Ecken (eigene Erweiterung, ~/Work/teams-schoen)",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://teams.cloud.microsoft/*",
+        "https://teams.microsoft.com/*"
+      ],
+      "css": ["farben.css", "teams.css"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://outlook.office.com/hosted/*",
+        "https://outlook.cloud.microsoft/hosted/*",
+        "https://outlook.office365.com/hosted/*"
+      ],
+      "css": ["farben.css", "kalender.css"],
+      "all_frames": true,
+      "run_at": "document_start"
+    }
+  ]
+}

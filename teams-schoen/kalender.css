@@ -1,0 +1,24 @@
+/* Teams-Kalender = eingebettetes Outlook (outlook.office.com/hosted/...).
+ * Die Fluent-Farben kommen aus farben.css; hier nur die älteren
+ * Outlook-Themenfarben (--theme...), die Outlook als Inline-Style auf <html>
+ * setzt. Gilt NUR im eingebetteten Kalender, nicht im normalen Outlook.
+ *
+ * themePrimary ist ein mittleres Grau (wie der Vantablack-Akzent #8d8d8d),
+ * weil Outlook darauf teils weisse Schrift setzt.
+ */
+:root {
+  --themePrimary:     #8f8a85 !important;
+  --themeDarkAlt:     #a29d97 !important;
+  --themeDark:        #b8b3ad !important;
+  --themeDarker:      #d6d2cd !important;
+  --themeSecondary:   #7d7873 !important;
+  --themeTertiary:    #5a5652 !important;
+  --themeLight:       #3a3735 !important;
+  --themeLighter:     #2a2826 !important;
+  --themeLighterAlt:  #1f1d1c !important;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}

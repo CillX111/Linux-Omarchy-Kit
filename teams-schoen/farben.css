@@ -1,0 +1,159 @@
+/* Teams im Rauchglas-Look (passend zu Vantablack + Omarchy-Glas-Stil).
+ *
+ * Werte wie überall auf dem System (shell.toml, Option A "Rauchglas"):
+ *   Graphit #151413, feiner weisser Rand 0.14, Ecken oben rechts / unten
+ *   links heller (0.55), Glanz oben 0.06, Auswahl 0.11 Füllung + 0.32 Rand.
+ *
+ * Funktioniert über die Fluent-UI-Farbvariablen (--color...) von Teams und
+ * die stabilen data-tid-Namen, nicht über die zufälligen Klassennamen.
+ * Gilt nur fürs dunkle Teams-Design (Einstellungen > Darstellung > Dunkel).
+ */
+
+/* ---------- Farben ---------- */
+/* Alle Fluent-Provider (auch die von Popups/Menüs, die eigene haben) */
+[class*="fui-FluentProvider"] {
+  /* Flächen: warmes Graphit statt Neutralgrau */
+  --colorNeutralBackground1:         #1b1a19 !important;
+  --colorNeutralBackground1Hover:    #252322 !important;
+  --colorNeutralBackground1Pressed:  #151413 !important;
+  --colorNeutralBackground1Selected: #282624 !important;
+  --colorNeutralBackground2:         #181716 !important;
+  --colorNeutralBackground2Hover:    #232120 !important;
+  --colorNeutralBackground2Pressed:  #131211 !important;
+  --colorNeutralBackground2Selected: #252321 !important;
+  --colorNeutralBackground3:         #151413 !important;
+  --colorNeutralBackground3Hover:    #201e1d !important;
+  --colorNeutralBackground3Pressed:  #100f0e !important;
+  --colorNeutralBackground3Selected: #22201f !important;
+  --colorNeutralBackground4:         #0e0d0d !important;
+  --colorNeutralBackground4Hover:    #1b1a19 !important;
+  --colorNeutralBackground4Pressed:  #090908 !important;
+  --colorNeutralBackground4Selected: #1a1918 !important;
+  --colorNeutralBackground5:         #0a0909 !important;
+  --colorNeutralBackground5Hover:    #171615 !important;
+  --colorNeutralBackground5Pressed:  #050505 !important;
+  --colorNeutralBackground5Selected: #151413 !important;
+  --colorNeutralBackground6:         #232120 !important;
+  --colorNeutralBackground7Hover:    #171615 !important;
+  --colorNeutralBackground7Pressed:  #0a0909 !important;
+  --colorNeutralBackground8:         #1b1a19 !important;
+  --colorNeutralBackgroundStatic:    #2b2927 !important;
+  --colorNeutralBackgroundDisabled:  #121110 !important;
+  --colorNeutralBackgroundDisabled2: #1b1a19 !important;
+  --colorNeutralBackgroundAlpha:     rgba(21, 20, 19, 0.60) !important;
+  --colorNeutralBackgroundAlpha2:    rgba(21, 20, 19, 0.72) !important;
+
+  /* Ränder: weiss mit wenig Deckkraft statt hartes Grau */
+  --colorNeutralStroke1:          rgba(255, 255, 255, 0.20) !important;
+  --colorNeutralStroke1Hover:     rgba(255, 255, 255, 0.32) !important;
+  --colorNeutralStroke1Pressed:   rgba(255, 255, 255, 0.26) !important;
+  --colorNeutralStroke1Selected:  rgba(255, 255, 255, 0.32) !important;
+  --colorNeutralStroke2:          rgba(255, 255, 255, 0.14) !important;
+  --colorNeutralStroke3:          rgba(255, 255, 255, 0.08) !important;
+  --colorNeutralStroke4:          rgba(255, 255, 255, 0.08) !important;
+  --colorNeutralStroke4Hover:     rgba(255, 255, 255, 0.12) !important;
+  --colorNeutralStroke4Selected:  rgba(255, 255, 255, 0.14) !important;
+  --colorNeutralStrokeSubtle:     #0a0909 !important;
+  --colorNeutralStrokeOnBrand:    #151413 !important;
+  --colorNeutralStrokeAccessibleSelected: #ffffff !important;
+
+  /* Hover / Auswahl wie im Startmenü */
+  --colorSubtleBackgroundHover:    rgba(255, 255, 255, 0.07) !important;
+  --colorSubtleBackgroundPressed:  rgba(255, 255, 255, 0.05) !important;
+  --colorSubtleBackgroundSelected: rgba(255, 255, 255, 0.11) !important;
+  --colorSubtleBackgroundLightAlphaHover: rgba(255, 255, 255, 0.07) !important;
+
+  /* Markenfarbe: kein Teams-Lila mehr, sondern Weiss/Graphit wie Vantablack */
+  --colorBrandBackground:          #e9e6e2 !important;
+  --colorBrandBackgroundHover:     #ffffff !important;
+  --colorBrandBackgroundPressed:   #cfcbc6 !important;
+  --colorBrandBackgroundSelected:  #dedad5 !important;
+  --colorBrandBackgroundStatic:    #e9e6e2 !important;
+  --colorBrandBackground3Static:   #cfcbc6 !important;
+  --colorBrandBackground4Static:   #3a3735 !important;
+  --colorNeutralForegroundOnBrand: #151413 !important;
+
+  --colorBrandBackground2:         #262423 !important;
+  --colorBrandBackground2Hover:    #2f2d2b !important;
+  --colorBrandBackground2Pressed:  #201e1d !important;
+
+  --colorBrandBackgroundInverted:         #ffffff !important;
+  --colorBrandBackgroundInvertedHover:    #ecebe9 !important;
+  --colorBrandBackgroundInvertedPressed:  #d6d4d1 !important;
+  --colorBrandBackgroundInvertedSelected: #e2e0dd !important;
+  --colorBrandForegroundInverted:         #151413 !important;
+  --colorBrandForegroundInvertedHover:    #151413 !important;
+  --colorBrandForegroundInvertedPressed:  #151413 !important;
+  --colorBrandForegroundOnLight:          #151413 !important;
+  --colorBrandForegroundOnLightHover:     #151413 !important;
+  --colorBrandForegroundOnLightPressed:   #151413 !important;
+  --colorBrandForegroundOnLightSelected:  #151413 !important;
+
+  --colorBrandForeground1:         #f2efeb !important;
+  --colorBrandForeground2:         #dcd8d3 !important;
+  --colorBrandForeground2Hover:    #ffffff !important;
+  --colorBrandForeground2Pressed:  #ffffff !important;
+  --colorBrandForegroundLink:         #d9d4ce !important;
+  --colorBrandForegroundLinkHover:    #ffffff !important;
+  --colorBrandForegroundLinkPressed:  #c4bfb9 !important;
+  --colorBrandForegroundLinkSelected: #d9d4ce !important;
+
+  --colorBrandStroke1:          rgba(255, 255, 255, 0.55) !important;
+  --colorBrandStroke2:          rgba(255, 255, 255, 0.18) !important;
+  --colorBrandStroke2Contrast:  rgba(255, 255, 255, 0.18) !important;
+  --colorBrandStroke2Hover:     rgba(255, 255, 255, 0.26) !important;
+  --colorBrandStroke2Pressed:   rgba(255, 255, 255, 0.14) !important;
+
+  --colorCompoundBrandBackground:        #f2efeb !important;
+  --colorCompoundBrandBackgroundHover:   #ffffff !important;
+  --colorCompoundBrandBackgroundPressed: #d6d2cd !important;
+  --colorCompoundBrandForeground1:        #f2efeb !important;
+  --colorCompoundBrandForeground1Hover:   #ffffff !important;
+  --colorCompoundBrandForeground1Pressed: #d6d2cd !important;
+  --colorCompoundBrandStroke:        rgba(255, 255, 255, 0.55) !important;
+  --colorCompoundBrandStrokeHover:   rgba(255, 255, 255, 0.70) !important;
+  --colorCompoundBrandStrokePressed: rgba(255, 255, 255, 0.40) !important;
+
+  /* Ausgewähltes Symbol in der App-Leiste links, Hover auf Symbolen */
+  --colorNeutralForeground2BrandHover:    #ffffff !important;
+  --colorNeutralForeground2BrandPressed:  #d6d2cd !important;
+  --colorNeutralForeground2BrandSelected: #ffffff !important;
+  --colorNeutralForeground3BrandHover:    #ffffff !important;
+  --colorNeutralForeground3BrandPressed:  #d6d2cd !important;
+  --colorNeutralForeground3BrandSelected: #ffffff !important;
+  --colorTeamsBrand1Hover:    #ffffff !important;
+  --colorTeamsBrand1Pressed:  #d6d2cd !important;
+  --colorTeamsBrand1Selected: #ffffff !important;
+
+  /* Leute ohne Profilbild: Graphit statt Lila */
+  --colorAvatar:           #e9e6e2 !important;
+  --colorAvatarBackground: #3a3735 !important;
+
+  /* Farbige Schimmer-Schatten (Copilot-Knöpfe usw.) neutral */
+  --colorTeamsButtonCompositeFocusShadow1: rgba(255, 255, 255, 0.04) !important;
+  --colorTeamsButtonCompositeFocusShadow2: rgba(255, 255, 255, 0.06) !important;
+  --colorTeamsButtonCompositeFocusShadow3: rgba(255, 255, 255, 0.04) !important;
+  --colorTeamsButtonCompositeFocusShadow4: rgba(255, 255, 255, 0.04) !important;
+  --colorTeamsButtonCompositeHoverShadow1: rgba(255, 255, 255, 0.02) !important;
+  --colorTeamsButtonCompositeHoverShadow2: rgba(255, 255, 255, 0.05) !important;
+  --colorTeamsButtonCompositeHoverShadow3: rgba(255, 255, 255, 0.03) !important;
+  --colorTeamsButtonCompositeHoverShadow4: rgba(255, 255, 255, 0.02) !important;
+  --colorTeamsCompositeActiveShadow1: rgba(255, 255, 255, 0.06) !important;
+  --colorTeamsCompositeActiveShadow2: rgba(255, 255, 255, 0.04) !important;
+  --colorTeamsCompositeActiveShadow3: rgba(255, 255, 255, 0.04) !important;
+  --colorTeamsCompositeActiveShadow4: rgba(255, 255, 255, 0.03) !important;
+  --colorTeamsCompositeHoverShadow1: rgba(255, 255, 255, 0.02) !important;
+  --colorTeamsCompositeHoverShadow2: rgba(255, 255, 255, 0.02) !important;
+  --colorTeamsCompositeHoverShadow3: rgba(255, 255, 255, 0.02) !important;
+  --colorTeamsCompositeHoverShadow4: rgba(255, 255, 255, 0.02) !important;
+
+  /* Weichere Schatten für Popups und Menüs */
+  --shadow16: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 12px 28px rgba(0, 0, 0, 0.55) !important;
+  --shadow28: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.60) !important;
+  --shadow64: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 32px 64px rgba(0, 0, 0, 0.60) !important;
+
+  /* Rundere Ecken */
+  --borderRadiusMedium:  8px !important;
+  --borderRadiusLarge:  12px !important;
+  --borderRadiusXLarge: 16px !important;
+}

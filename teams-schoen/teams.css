@@ -1,0 +1,123 @@
+/* Teams-Rauchglas: Aufbau (schwebende Glas-Karten, Blasen, Beiträge).
+ * Die Farben selbst stehen in farben.css.
+ * Hängt an den stabilen data-tid-Namen von Teams und den fui-*-Klassen von
+ * Fluent UI, nicht an den zufälligen Klassennamen.
+ */
+
+/* ---------- Grundfläche ---------- */
+html, body {
+  background:
+    radial-gradient(1400px 700px at 12% -10%, rgba(255, 255, 255, 0.045), transparent 70%),
+    radial-gradient(1000px 600px at 105% 110%, rgba(255, 255, 255, 0.03), transparent 70%),
+    #0a0909 !important;
+}
+
+/* Titelleiste und App-Leiste links liegen direkt auf der Grundfläche */
+[data-tid="title-bar"] {
+  background: transparent !important;
+}
+
+/* ---------- Glas-Karten ---------- */
+/* Liste (Chats/Teams) und Inhalt schweben als Karten auf der Grundfläche */
+[data-tid="app-layout-area--mid-nav"],
+[data-tid="app-layout-area--header"],
+[data-tid="app-layout-area--main"] {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 90px) padding-box,
+    linear-gradient(#151413, #151413) padding-box,
+    linear-gradient(225deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.16) 14%,
+      rgba(255, 255, 255, 0.12) 30%,
+      rgba(255, 255, 255, 0.12) 70%,
+      rgba(255, 255, 255, 0.16) 86%,
+      rgba(255, 255, 255, 0.55) 100%) border-box !important;
+  overflow: hidden !important;
+}
+
+[data-tid="app-layout-area--mid-nav"] {
+  margin: 0 8px 10px 0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Kopfzeile + Inhalt = eine Karte, oben bzw. unten gerundet */
+[data-tid="app-layout-area--header"] {
+  margin: 0 10px 0 0 !important;
+  border-radius: 16px 16px 0 0 !important;
+  border-bottom: 0 !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)) padding-box,
+    linear-gradient(#151413, #151413) padding-box,
+    linear-gradient(225deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.16) 14%, rgba(255, 255, 255, 0.12) 40%) border-box !important;
+}
+[data-tid="app-layout-area--main"] {
+  margin: 0 10px 10px 0 !important;
+  border-radius: 0 0 16px 16px !important;
+  border-top: 0 !important;
+  background:
+    linear-gradient(#151413, #151413) padding-box,
+    linear-gradient(225deg, rgba(255, 255, 255, 0.12) 60%, rgba(255, 255, 255, 0.16) 86%, rgba(255, 255, 255, 0.55) 100%) border-box !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+}
+/* Kopfzeile ohne Kopf (z. B. Kalender, Aktivität): Inhalt rundum gerundet */
+[data-tid="app-layout-area--header"]:not(:has([data-tid="slot-measurer"] > *)) {
+  border: 0 !important;
+  background: none !important;
+  margin: 0 !important;
+}
+[data-tid="app-layout-area--unified-areas"]:has(> [data-tid="app-layout-area--header"]:not(:has([data-tid="slot-measurer"] > *))) > [data-tid="app-layout-area--main"] {
+  border-radius: 16px !important;
+  border-top: 1px solid transparent !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 90px) padding-box,
+    linear-gradient(#151413, #151413) padding-box,
+    linear-gradient(225deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.16) 14%,
+      rgba(255, 255, 255, 0.12) 30%,
+      rgba(255, 255, 255, 0.12) 70%,
+      rgba(255, 255, 255, 0.16) 86%,
+      rgba(255, 255, 255, 0.55) 100%) border-box !important;
+}
+
+/* Was in den Karten liegt, malt keinen eigenen Hintergrund darüber */
+[data-tid="app-layout-area--mid-nav"] > [data-tid="slot-measurer"],
+[data-tid="app-layout-area--mid-nav"] > [data-tid="slot-measurer"] > div,
+[data-tid="app-layout-area--main"] > [data-tid="slot-measurer"],
+[data-tid="app-layout-area--main"] > [data-tid="slot-measurer"] > div,
+[data-tid="entity-header"] {
+  background: transparent !important;
+}
+[data-tid="entity-header"] {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ---------- Beiträge in Kanälen ---------- */
+[data-tid="channel-pane-message"] {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+/* ---------- Chat-Blasen ---------- */
+/* Eigene Nachrichten: etwas helleres Graphit mit feinem Rand statt Blaulila */
+.fui-ChatMyMessage__body {
+  background: #2a2826 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 14px !important;
+}
+/* Nachrichten der anderen */
+.fui-ChatMessage__body {
+  background: #1d1c1b !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+}
+
+/* ---------- Scrollbalken: dünn und dezent ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}

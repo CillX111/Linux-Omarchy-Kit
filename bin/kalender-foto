@@ -1,0 +1,567 @@
+#!/usr/bin/python3 -I
+"""kalender-foto – ein Screenshot vom Kalender, Claude liest die Termine, Erinnerungen.
+Gehoert zum Leisten-Widget ~/.config/omarchy/plugins/cillian.kalender
+Fotos: ~/Pictures/Kalender/DATUM.png   Termine aller gelesenen Tage: ~/Pictures/Kalender/termine.json
+
+  kalender-foto shoot          Bereich auswaehlen -> Foto fuer heute (+ Termine lesen)
+  kalender-foto paste          Bild aus der Zwischenablage -> Foto fuer heute
+  kalender-foto read [DATUM]   Termine (nochmal) aus dem Foto lesen (claude -p)
+  kalender-foto status         JSON fuer das Widget
+  kalender-foto remind         Erinnerungen (Foto fehlt / Termin in 10 Min.)
+  kalender-foto open [DATUM]   Foto gross in imv oeffnen
+  kalender-foto edit DATUM JSON  Termin speichern/loeschen ({"op":"save","event":{..}} / {"op":"delete","id":..})
+  kalender-foto set JSON       Einstellungen aendern (~/.config/kalender-foto/settings.json)
+"""
+import base64
+import datetime as dt
+import fcntl
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+HOME = os.path.expanduser("~")
+DIR = os.environ.get("KALENDER_FOTO_DIR", os.path.join(HOME, "Pictures", "Kalender"))
+STATE = os.path.join(HOME, ".local", "state", "kalender-foto")
+PLUGIN = "cillian.kalender"
+SELF = os.path.realpath(__file__)
+
+CONF = os.path.join(HOME, ".config", "kalender-foto")
+SETTINGS = os.path.join(CONF, "settings.json")
+# Standardwerte (im Panel unter ⚙ einstellbar)
+DEFAULTS = {
+    "lead": 10,          # Termin-Erinnerung so viele Minuten vorher (0 = aus)
+    "teamsLead": -1,     # Teams-Calls: eigene Minuten vorher (-1 = wie lead, 0 = aus)
+    "atStart": False,    # zusaetzlich beim Beginn erinnern
+    "teamsOnly": False,  # nur Teams-Calls erinnern
+    "morning": True,     # erinnern, wenn das Foto fuer heute fehlt
+    "morningFrom": 5,    # ab ... Uhr
+    "morningTo": 17,     # bis ... Uhr
+    "repeat": 90,        # alle ... Minuten wieder
+    "days": [1, 2, 3, 4, 5],  # Wochentage (1 = Mo)
+    "model": "sonnet",   # Modell zum Auslesen
+}
+MODELS = ("haiku", "sonnet", "opus")
+
+WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
+          "September", "Oktober", "November", "Dezember"]
+
+os.makedirs(DIR, exist_ok=True)
+os.makedirs(STATE, exist_ok=True)
+os.makedirs(CONF, exist_ok=True)
+
+
+def valid_setting(k, v):
+    if k in ("atStart", "teamsOnly", "morning"):
+        return isinstance(v, bool)
+    if k == "lead":
+        return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 240
+    if k == "teamsLead":
+        return isinstance(v, int) and not isinstance(v, bool) and -1 <= v <= 240
+    if k in ("morningFrom", "morningTo"):
+        return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 24
+    if k == "repeat":
+        return isinstance(v, int) and not isinstance(v, bool) and 15 <= v <= 720
+    if k == "days":
+        return isinstance(v, list) and all(isinstance(x, int) and 1 <= x <= 7 for x in v)
+    if k == "model":
+        return v in MODELS
+    return False
+
+
+def settings():
+    s = dict(DEFAULTS)
+    try:
+        with open(SETTINGS) as f:
+            user = json.load(f)
+        for k, v in (user or {}).items():
+            if k in DEFAULTS and valid_setting(k, v):
+                s[k] = v
+    except (OSError, ValueError, AttributeError):
+        pass
+    if s["morningTo"] <= s["morningFrom"]:
+        s["morningTo"] = min(24, s["morningFrom"] + 1)
+    return s
+
+
+def today():
+    return dt.date.today().isoformat()
+
+
+def photo(d):
+    return os.path.join(DIR, d + ".png")
+
+
+TERMINE = os.path.join(DIR, "termine.json")
+KEEP_DAYS = 90
+
+
+class store_lock:
+    """Sperre fuer termine.json (lesen/aendern/schreiben)."""
+    def __enter__(self):
+        self.f = open(os.path.join(STATE, "store.lock"), "w")
+        fcntl.flock(self.f, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *a):
+        self.f.close()
+
+
+def load_store():
+    st = read_json(TERMINE, None)
+    if not isinstance(st, dict):
+        st = {}
+    st.setdefault("status", "")
+    if not isinstance(st.get("days"), dict):
+        st["days"] = {}
+    return st
+
+
+def new_id():
+    return os.urandom(4).hex()
+
+
+def ensure_ids(st):
+    for day in st["days"].values():
+        for e in day.get("events") or []:
+            if not e.get("id"):
+                e["id"] = new_id()
+
+
+def ev_key(e):
+    return f"{e.get('start', '')}|{e.get('title', '')}"
+
+
+def update_store(**kw):
+    with store_lock():
+        st = load_store()
+        st.update(kw)
+        write_json(TERMINE, st)
+
+
+def day_events(d):
+    day = load_store()["days"].get(d) or {}
+    return day.get("events") or []
+
+
+def write_json(path, data):
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-")
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+
+
+def read_json(path, default=None):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def notify(summary, body="", urgency="normal"):
+    subprocess.run(["notify-send", "-a", "Kalender", "-i", "x-office-calendar",
+                    "-u", urgency, summary, body], check=False)
+
+
+def detached(*args):
+    subprocess.Popen([sys.executable, "-I", SELF, *args], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def summon():
+    subprocess.run(["omarchy-shell", "shell", "summon", PLUGIN], check=False,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def saved(d):
+    # neues Foto -> gleich die Termine daraus lesen
+    update_store(status="reading", photo=d, msg="")
+    detached("read", d)
+    summon()
+
+
+# ------------------------------------------------------------------ Foto
+def cmd_shoot():
+    time.sleep(0.35)  # Panel erst verschwinden lassen
+    r = subprocess.run(["slurp", "-d"], capture_output=True, text=True)
+    region = r.stdout.strip()
+    if r.returncode != 0 or not region:
+        return 1
+    fd, tmp = tempfile.mkstemp(dir=DIR, prefix=".neu-", suffix=".png")
+    os.close(fd)
+    if subprocess.run(["grim", "-g", region, tmp]).returncode != 0:
+        os.unlink(tmp)
+        notify("Kalender-Foto fehlgeschlagen", "grim konnte keinen Screenshot machen.", "critical")
+        return 1
+    d = today()
+    os.replace(tmp, photo(d))
+    saved(d)
+    return 0
+
+
+def cmd_paste():
+    types = subprocess.run(["wl-paste", "--list-types"], capture_output=True, text=True).stdout
+    if "image/png" not in types.split():
+        notify("Kein Bild in der Zwischenablage",
+               "Mach zuerst einen Screenshot oder nimm direkt mit «Aufnehmen» auf.")
+        return 1
+    fd, tmp = tempfile.mkstemp(dir=DIR, prefix=".neu-", suffix=".png")
+    with os.fdopen(fd, "wb") as f:
+        ok = subprocess.run(["wl-paste", "--type", "image/png"], stdout=f).returncode == 0
+    if not ok or os.path.getsize(tmp) == 0:
+        os.unlink(tmp)
+        return 1
+    d = today()
+    os.replace(tmp, photo(d))
+    saved(d)
+    return 0
+
+
+# ------------------------------------------------------------------ Termine lesen
+def claude_bin():
+    return shutil.which("claude") or os.path.join(
+        HOME, ".local/share/mise/installs/claude/latest/claude")
+
+
+def prompt_for(d):
+    day = dt.date.fromisoformat(d)
+    heute = f"{WOCHENTAGE[day.weekday()]}, der {day.day}. {MONATE[day.month - 1]} {day.year}"
+    return f"""Das Bild ist ein Screenshot von einem Kalender (meist Outlook, Tages- oder Wochenansicht).
+Das Foto wurde am {heute} ({d}) gemacht.
+
+Lies ALLE Tage aus, die im Bild als Spalte/Bereich sichtbar sind, jeden mit seinen Terminen:
+- Das Datum jeder Spalte ergibt sich aus der Kopfzeile (Tageszahl + Wochentag) und Monat/Jahr oben im Kalender; nimm den {d} als Referenz.
+- Termine gehören zu der Spalte, in der ihr Kasten steht.
+- Start und Ende an der Stundenskala am linken Rand ablesen: oberer Rand des Termin-Kastens = Start, unterer Rand = Ende. Auf 5 Minuten runden. Steht eine Uhrzeit im Termin selbst, hat die Vorrang.
+- Termine nebeneinander (überlappend) einzeln aufführen.
+- "titel" so, wie er im Kasten steht (ohne Symbole). "info" = zweite Textzeile/Ort/Raum, falls sichtbar, sonst "".
+- "farbe" = Farbe des Termins als Hex (die kräftige Farbe des Randstreifens, sonst die Füllfarbe), z.B. "#e8a33d".
+- "teams": true, wenn der Termin gelb/orange ist oder ein Teams-/Personen-Symbol hat (das sind Teams-Calls), sonst false.
+- Ganztägige Termine: "ganztags": true, start/ende "".
+- Sichtbare Tage ohne Termine trotzdem aufführen (leere Liste).
+
+Antworte NUR mit JSON, ohne Erklärung und ohne Codeblock:
+{{"tage":[{{"datum":"YYYY-MM-DD","termine":[{{"start":"HH:MM","ende":"HH:MM","titel":"...","info":"","farbe":"#rrggbb","teams":false,"ganztags":false}}]}}],"hinweis":""}}"""
+
+
+def parse_answer(s):
+    s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s.strip())
+    a, b = s.find("{"), s.rfind("}")
+    if a < 0 or b < a:
+        raise ValueError("keine JSON-Antwort")
+    return json.loads(s[a:b + 1])
+
+
+def clean_time(t):
+    m = re.match(r"^\s*(\d{1,2})[:.](\d{2})", str(t or ""))
+    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
+
+
+def clean_color(c):
+    c = str(c or "").strip()
+    return c if re.fullmatch(r"#[0-9a-fA-F]{6}", c) else ""
+
+
+def is_yellow(c):
+    """gelb/orange = Teams-Call (Regel vom User)"""
+    if not c:
+        return False
+    import colorsys
+    r, g, b = (int(c[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    h, l, sat = colorsys.rgb_to_hls(r, g, b)
+    return 0.07 <= h <= 0.17 and sat >= 0.45 and 0.3 <= l <= 0.92
+
+
+def clean_events(items):
+    events = []
+    for t in items or []:
+        allday = bool(t.get("ganztags"))
+        start, end = clean_time(t.get("start")), clean_time(t.get("ende"))
+        titel = str(t.get("titel") or "").strip()
+        if not titel or (not allday and not start):
+            continue
+        events.append({"id": new_id(), "start": "" if allday else start, "end": "" if allday else end,
+                       "title": titel, "info": str(t.get("info") or t.get("ort") or "").strip(),
+                       "color": clean_color(t.get("farbe")), "allday": allday,
+                       "teams": bool(t.get("teams")) or is_yellow(clean_color(t.get("farbe")))})
+    events.sort(key=lambda e: (not e["allday"], e["start"], e["end"]))
+    return events
+
+
+def cmd_read(d=None):
+    d = d or today()
+    p = photo(d)
+    if not os.path.exists(p):
+        print(f"Kein Foto für {d}", file=sys.stderr)
+        return 1
+    update_store(status="reading", photo=d, msg="")
+    with open(p, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    msg = {"type": "user", "message": {"role": "user", "content": [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}},
+        {"type": "text", "text": prompt_for(d)},
+    ]}}
+    cmd = [claude_bin(), "-p", "--model", settings()["model"], "--tools", "", "--no-session-persistence",
+           "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
+    result, err, data = None, None, None
+    try:
+        r = subprocess.run(cmd, input=json.dumps(msg) + "\n", capture_output=True, text=True,
+                           timeout=300, cwd=STATE)
+        for line in r.stdout.splitlines():
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if ev.get("type") == "result":
+                if ev.get("is_error"):
+                    err = str(ev.get("result") or ev.get("subtype"))
+                else:
+                    result = ev.get("result")
+        if result is None and not err:
+            err = (r.stderr or "keine Antwort von Claude").strip()[-300:]
+        if result is not None:
+            data = parse_answer(result)
+    except Exception as e:  # noqa: BLE001 – alles soll im Panel landen
+        err, data = err or str(e), None
+
+    tage = data.get("tage") if isinstance(data, dict) else None
+    if not isinstance(tage, list):
+        update_store(status="error", photo=d, msg=err or "Antwort ohne Tage")
+        notify("Termine konnten nicht gelesen werden", (err or "")[:200])
+        return 1
+
+    with store_lock():
+        st = load_store()
+        ensure_ids(st)
+        for tag in tage:
+            datum = str(tag.get("datum") or "")
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", datum):
+                continue
+            old = st["days"].get(datum) or {}
+            # selbst angelegte/geaenderte Termine bleiben, geloeschte kommen nicht zurueck
+            manual = [e for e in old.get("events") or [] if e.get("manual")]
+            hidden = list(old.get("hidden") or [])
+            skip = set(hidden) | {e["orig"] for e in manual if e.get("orig")}
+            fresh = [e for e in clean_events(tag.get("termine")) if ev_key(e) not in skip]
+            events = manual + fresh
+            events.sort(key=lambda e: (not e.get("allday"), e.get("start", ""), e.get("end", "")))
+            st["days"][datum] = {"events": events, "src": d, "hidden": hidden}
+        cutoff = (dt.date.today() - dt.timedelta(days=KEEP_DAYS)).isoformat()
+        st["days"] = {k: v for k, v in sorted(st["days"].items()) if k >= cutoff}
+        st.update(status="ok", photo=d, msg="", hint=str(data.get("hinweis") or ""),
+                  read_at=dt.datetime.now().isoformat(timespec="seconds"))
+        write_json(TERMINE, st)
+
+    t = today()
+    if d == t:
+        n = len(day_events(t))
+        if t not in load_store()["days"]:
+            notify("Heute ist nicht im Kalender-Foto", "Mach den Screenshot so, dass der heutige Tag sichtbar ist.")
+        elif n:
+            cfg = settings()
+            msg = f"Ich erinnere dich jeweils {cfg['lead']} Min. vorher" if cfg["lead"] else "Termin-Erinnerungen sind aus"
+            if cfg["teamsLead"] >= 0:
+                msg += f", Teams-Calls {cfg['teamsLead']} Min. vorher" if cfg["teamsLead"] else ", Teams-Calls gar nicht"
+            notify(f"Kalender gelesen: {n} Termine heute", msg + ".")
+        else:
+            notify("Kalender gelesen: heute keine Termine")
+    return 0
+
+
+# ------------------------------------------------------------------ Status
+def next_event(d):
+    now = dt.datetime.now().strftime("%H:%M")
+    for e in day_events(d):
+        if not e.get("allday") and e.get("start", "") >= now:
+            return e
+    return None
+
+
+def cmd_status():
+    t = today()
+    days = sorted((f[:-4] for f in os.listdir(DIR)
+                   if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.png", f)), reverse=True)[:60]
+    st = load_store()
+    print(json.dumps({"today": t, "has": os.path.exists(photo(t)), "dir": DIR, "photos": days,
+                      "store": TERMINE, "eventsStatus": st.get("status", ""),
+                      "next": next_event(t), "lead": settings()["lead"],
+                      "settings": settings()}, ensure_ascii=False))
+    return 0
+
+
+# ------------------------------------------------------------------ Erinnern
+def cmd_remind():
+    # mehrere Leisten (pro Monitor) rufen das gleichzeitig -> nur einer darf
+    lock = open(os.path.join(STATE, "remind.lock"), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0
+    t = today()
+    now = dt.datetime.now()
+    cfg = settings()
+
+    # 1) Foto fuer heute fehlt
+    if cfg["morning"] and not os.path.exists(photo(t)) and now.isoweekday() in cfg["days"] \
+            and cfg["morningFrom"] <= now.hour < cfg["morningTo"]:
+        try:
+            last = float(open(os.path.join(STATE, "last-remind")).read().strip())
+        except (OSError, ValueError):
+            last = 0
+        last_day = dt.date.fromtimestamp(last).isoformat() if last else ""
+        if last_day != t or time.time() - last >= cfg["repeat"] * 60:
+            with open(os.path.join(STATE, "last-remind"), "w") as f:
+                f.write(str(int(time.time())))
+            detached("_ask")
+
+    # 2) Termine: x Min. vorher (pro Termin einstellbar) + evtl. beim Beginn
+    events = day_events(t)
+    if events:
+        seen_path = os.path.join(STATE, f"erinnert-{t}.json")
+        seen = set(read_json(seen_path, []) or [])
+        changed = False
+        for e in events:
+            if e.get("allday") or not e.get("start"):
+                continue
+            h, m = map(int, e["start"].split(":"))
+            start = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            mins = (start - now).total_seconds() / 60
+            if cfg["teamsOnly"] and not e.get("teams"):
+                continue
+            lead = e.get("remind")
+            if not isinstance(lead, int) or isinstance(lead, bool):
+                lead = cfg["teamsLead"] if e.get("teams") and cfg["teamsLead"] >= 0 else cfg["lead"]
+            key = ev_key(e)
+            when = f"{e['start']}–{e['end']}" if e.get("end") else e["start"]
+            body = when + (f" · {e['info']}" if e.get("info") else "")
+            kind = "Teams-Call" if e.get("teams") else "Termin"
+            if lead > 0 and 0 < mins <= lead and key not in seen:
+                seen.add(key)
+                changed = True
+                notify(f"{kind} in {max(1, round(mins))} Min: {e['title']}", body, "critical")
+            if cfg["atStart"] and lead != 0 and -2 < mins <= 0 and key + "|start" not in seen:
+                seen.add(key + "|start")
+                changed = True
+                notify(f"{kind} jetzt: {e['title']}", body, "critical")
+        if changed:
+            write_json(seen_path, sorted(seen))
+        # alte Merk-Dateien aufraeumen
+        for f in os.listdir(STATE):
+            if f.startswith("erinnert-") and f != f"erinnert-{t}.json":
+                os.unlink(os.path.join(STATE, f))
+    return 0
+
+
+# ------------------------------------------------------------------ Bearbeiten
+def clean_user_event(e):
+    allday = bool(e.get("allday"))
+    start, end = clean_time(e.get("start")), clean_time(e.get("end"))
+    title = str(e.get("title") or "").strip()
+    if not title:
+        raise ValueError("Titel fehlt")
+    if not allday and not start:
+        raise ValueError("Startzeit fehlt")
+    if end and start and end <= start:
+        raise ValueError("Ende muss nach dem Start sein")
+    remind = e.get("remind")
+    if not (isinstance(remind, int) and not isinstance(remind, bool) and 0 <= remind <= 240):
+        remind = None
+    return {"start": "" if allday else start, "end": "" if allday else end, "title": title,
+            "info": str(e.get("info") or "").strip(), "color": clean_color(e.get("color")),
+            "teams": bool(e.get("teams")), "allday": allday, "remind": remind}
+
+
+def cmd_edit(d=None, payload=None):
+    if not d or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) or not payload:
+        print("kalender-foto edit DATUM JSON", file=sys.stderr)
+        return 2
+    try:
+        op = json.loads(payload)
+        with store_lock():
+            st = load_store()
+            ensure_ids(st)
+            day = st["days"].setdefault(d, {"events": [], "src": ""})
+            evs = day.setdefault("events", [])
+            hidden = day.setdefault("hidden", [])
+            if op.get("op") == "delete":
+                for e in evs:
+                    if e.get("id") == op.get("id") and (not e.get("manual") or e.get("orig")):
+                        hidden.append(e.get("orig") or ev_key(e))
+                day["events"] = [e for e in evs if e.get("id") != op.get("id")]
+            elif op.get("op") == "save":
+                new = clean_user_event(op.get("event") or {})
+                old = next((e for e in evs if e.get("id") and e.get("id") == (op.get("event") or {}).get("id")), None)
+                if old:
+                    orig = old.get("orig") or (None if old.get("manual") else ev_key(old))
+                    new.update(id=old["id"], manual=True, orig=orig)
+                    evs[evs.index(old)] = new
+                else:
+                    new.update(id=new_id(), manual=True, orig=None)
+                    evs.append(new)
+            else:
+                raise ValueError("unbekannte Aktion")
+            day["events"].sort(key=lambda e: (not e.get("allday"), e.get("start", ""), e.get("end", "")))
+            write_json(TERMINE, st)
+    except (ValueError, TypeError, AttributeError) as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_set(payload=None):
+    try:
+        patch = json.loads(payload or "{}")
+        bad = [k for k, v in patch.items() if k not in DEFAULTS or not valid_setting(k, v)]
+        if bad:
+            raise ValueError("ungueltig: " + ", ".join(bad))
+        with store_lock():
+            cur = read_json(SETTINGS, {}) or {}
+            cur.update(patch)
+            write_json(SETTINGS, cur)
+    except (ValueError, AttributeError) as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    print(json.dumps(settings()))
+    return 0
+
+
+def cmd_ask():
+    r = subprocess.run(["notify-send", "-a", "Kalender", "-i", "x-office-calendar",
+                        "-A", "shoot=Jetzt aufnehmen", "--wait",
+                        "Kalender-Foto für heute fehlt",
+                        "Öffne deinen Kalender und mach einen Screenshot davon."],
+                       capture_output=True, text=True)
+    if r.stdout.strip() == "shoot":
+        return cmd_shoot()
+    return 0
+
+
+def cmd_open(d=None):
+    d = d or today()
+    if not os.path.exists(photo(d)):
+        notify(f"Kein Foto für {d}")
+        return 1
+    os.execvp("imv", ["imv", photo(d)])
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else ""
+    rest = args[1:]
+    table = {"shoot": cmd_shoot, "paste": cmd_paste, "status": cmd_status, "remind": cmd_remind,
+             "_ask": cmd_ask, "read": lambda: cmd_read(*rest[:1]), "open": lambda: cmd_open(*rest[:1]),
+             "edit": lambda: cmd_edit(*rest[:2]), "set": lambda: cmd_set(*rest[:1])}
+    if cmd not in table:
+        print(__doc__.strip())
+        return 2
+    return table[cmd]() or 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

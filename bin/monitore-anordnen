@@ -1,0 +1,37 @@
+#!/bin/bash
+# Monitore anordnen wie in Windows (Anzeige -> Bildschirme neu anordnen).
+#   monitore-anordnen          -> Fenster oeffnen/schliessen
+#   monitore-anordnen list     -> aktive Monitore als JSON
+#   monitore-anordnen apply '[{"name":"DP-4","x":0,"y":0},...]'
+#       setzt die Positionen sofort und speichert sie in ~/.config/hypr/monitors.lua
+set -euo pipefail
+CONF="$HOME/.config/hypr/monitors.lua"
+START="-- >>> monitore-anordnen (automatisch, nicht von Hand aendern)"
+END="-- <<< monitore-anordnen"
+
+case "${1:-toggle}" in
+  toggle) exec omarchy-shell shell toggle cillian.monitore ;;
+  list) hyprctl monitors -j | jq -c '[.[] | select(.disabled|not) | {id, name, description, width, height, refreshRate, scale, transform, x, y, focused}]' ;;
+  apply)
+    want="$2"
+    mons=$(hyprctl monitors -j)
+    block="$START"$'\n'
+    while read -r name x y; do
+      m=$(jq -c --arg n "$name" '.[]|select(.name==$n)' <<<"$mons")
+      [ -z "$m" ] && continue
+      mode=$(jq -r '"\(.width)x\(.height)@\(.refreshRate*100|round/100)"' <<<"$m")
+      scale=$(jq -r '.scale' <<<"$m"); tr=$(jq -r '.transform' <<<"$m")
+      desc=$(jq -r '.description' <<<"$m" | sed 's/["\\]//g')
+      hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"${x}x${y}\", scale = $scale, transform = $tr })" >/dev/null
+      block+="hl.monitor({ output = \"desc:$desc\", mode = \"$mode\", position = \"${x}x${y}\", scale = $scale, transform = $tr })"$'\n'
+    done < <(jq -r '.[] | "\(.name) \(.x|round) \(.y|round)"' <<<"$want")
+    block+="$END"
+    cp "$CONF" "$CONF.bak.$(date +%s)"
+    # alten Block entfernen, neuen ans Ende haengen
+    awk -v s="$START" -v e="$END" '$0==s{skip=1} !skip{print} $0==e{skip=0}' "$CONF" > "$CONF.tmp"
+    sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$CONF.tmp"
+    printf '\n%s\n' "$block" >> "$CONF.tmp"
+    mv "$CONF.tmp" "$CONF"
+    echo ok ;;
+  *) echo "Unbekannt: $1" >&2; exit 1 ;;
+esac

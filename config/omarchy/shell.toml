@@ -1,0 +1,110 @@
+# Eigene Anpassungen über dem Theme (gilt für jedes Theme).
+#
+# Einheitlicher Glas-Stil = Option "A - Rauchglas" aus den Vergleichsbildern
+# (~/Pictures/glas-vergleich/2-A-rauchglas.png), 2026-11-05 vom User gewählt:
+# "einfach nur Option A, nicht dunkler". Graphit #151413, ~30 % durchsichtig
+# (0.70), Hintergrund per Hyprland-Blur nur hinter der Karte weichgezeichnet
+# (layer_rules in looknfeel.lua), feiner weisser Rand 0.14 / 1 px, Glanz oben
+# 0.06 (eigene Plugins), Auswahl 0.11 Füllung + 0.32 Rand.
+# Rand: wie das Licht auf dem Startmenü-Rand, aber stillstehend: oben rechts
+# und unten links hell (0.55), sonst 0.12-0.16 (User: "nur das Menü ist so").
+# Gilt ÜBERALL: Startmenü, Leiste, Leisten-Fenster, Omarchy-Menü/Apps-Starter,
+# Zwischenablage, Emojis, Benachrichtigungen, Passwort-Fenster, OSD,
+# Sperrbildschirm, Musik-Panel, Kalender. Nicht: normale App-Fenster.
+
+# Glas-Leiste (Plugin cillian.leiste): die Leiste etwas höher, damit die
+# Glas-Kapsel oben und unten Luft hat, und ohne eigenen Hintergrund – das Glas
+# kommt vom Plugin. Text bleibt in der Theme-Farbe (bar.transparent = false).
+[bar]
+background-alpha = 0.0
+size-horizontal  = 32
+
+# Leisten-Fenster (Audio, WLAN, Bluetooth, Akku, Uhr, Wetter, Monitor ...),
+# Lautstärke-/Helligkeits-Anzeige, Aufklapp-Listen
+[popups]
+background       = "#151413"
+background-alpha = 0.70
+border           = "rgba(ffffff8c) rgba(ffffff29) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff29) rgba(ffffff8c) 135deg"
+border-alpha     = 1.0
+border-width     = 1
+
+[tooltip]
+background       = "#151413"
+background-alpha = 0.9
+border           = "#ffffff"
+border-alpha     = 0.14
+
+# Omarchy-Menü, Zwischenablage, Emojis – und alles, was Color.menu nimmt
+# (Startmenü, Musik-Panel, Kalender)
+[menu]
+background                = "#151413"
+background-alpha          = 0.70
+border                    = "rgba(ffffff8c) rgba(ffffff29) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff29) rgba(ffffff8c) 135deg"
+border-alpha              = 1.0
+border-width              = 1
+scrim                     = "#000000"
+scrim-alpha               = 0.22
+selected-background       = "#ffffff"
+selected-background-alpha = 0.11
+selected-text             = "#ffffff"
+selected-border           = "#ffffff"
+selected-border-alpha     = 0.32
+
+[notifications]
+background       = "#151413"
+background-alpha = 0.70
+border           = "rgba(ffffff8c) rgba(ffffff29) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff29) rgba(ffffff8c) 135deg"
+border-alpha     = 1.0
+border-width     = 1
+
+# Passwort-/Berechtigungs-Fenster
+[polkit]
+background       = "#151413"
+background-alpha = 0.70
+border           = "rgba(ffffff8c) rgba(ffffff29) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff29) rgba(ffffff8c) 135deg"
+border-alpha     = 1.0
+scrim            = "#000000"
+scrim-alpha      = 0.22
+
+# Sperrbildschirm: nur die Karte im Glas-Ton, Ränder/Fehlerfarben bleiben Theme
+[lock]
+background       = "#151413"
+background-alpha = 0.70
+
+# Inhalt: Knöpfe/Zeilen/Reiter dezent wie die Kacheln im Startmenü
+[controls]
+normal-fill-alpha         = 0.05
+normal-border-alpha       = 0.12
+hover-cursor-fill-alpha   = 0.09
+hover-cursor-border-alpha = 0.24
+focus-fill-alpha          = 0.09
+focus-border-alpha        = 0.24
+selected-fill-alpha       = 0.13
+selected-border-width     = 1
+selected-border-alpha     = 0.32
+
+# Nachtrag gleicher Tag (User: "nein, mach es überall so"): auch Apps-Starter,
+# Bilder-Auswahl (Hintergrund/Theme) und Ränder am Sperrbildschirm.
+[launcher]
+background                = "#151413"
+background-alpha          = 0.70
+border                    = "rgba(ffffff8c) rgba(ffffff29) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff1f) rgba(ffffff29) rgba(ffffff8c) 135deg"
+border-alpha              = 1.0
+scrim                     = "#000000"
+scrim-alpha               = 0.22
+selected-background       = "#ffffff"
+selected-background-alpha = 0.11
+selected-text             = "#ffffff"
+selected-border           = "#ffffff"
+selected-border-alpha     = 0.32
+
+[image-picker]
+scrim                   = "#000000"
+scrim-alpha             = 0.22
+selected-border         = "#ffffff"
+selected-border-alpha   = 0.9
+unselected-border       = "#ffffff"
+unselected-border-alpha = 0.14
+
+[font]
+base-size = 12
