@@ -103,3 +103,7 @@ den `teams-schoen`-Pfad aus `brave-flags.conf` nehmen.
   und `omarchy.background` (MIT-Lizenz, © Omarchy). Omarchy-Updates an diesen beiden
   Plugins kommen bei den Klonen nicht automatisch an.
 - Hintergrundbilder sind nicht dabei (fremde Bilder).
+
+## Lizenz
+
+Eigene Dateien: [GPL-3.0](LICENSE). `cillian.agents` und `cillian.background` basieren auf Omarchy-Plugins und behalten deren MIT-Lizenz (© Omarchy).
